@@ -1,0 +1,477 @@
+---
+title: "Examining the factors that influence Depression "
+R Packages: dplyr, pastecs, ggplot2, pysch, semTools, car, pander
+R Version: 3.5.1
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+Student Number: D17129566
+Student Name: PRIYAM BANSAL
+Programme Code: DT228A
+---
+
+##1 INTRODUCTION
+
+Depression is a very common condition which affects 1in 10 people at any one time 450000 people alone in Ireland this stats is read from the internet. It can vary from mild to severe and can have an impact on little aspects of an individual also and we can say visa versa for depression as many small factors can also lead us getting into it. stats say that depression can be caused by factors  sad, anxious, guilty, low energy, fatigued, any change to a normal sleep pattern,
+poor concentration, loss of interest in hobbies, family or social life, low self-esteem,
+ physical aches, loss of interest in living.
+for my model  I am finding which all factors have an effect on depression the factors that we are considering are anxiety, sleepy and other sensation scales, do you have a problem with your sleep, medication help
+we are taking these factors as they are related to the reasons we previously saw in the real stats as 
+if a person is having anxiety he/she is likely to have mild t severe depression
+similarly to a person if we consider sleepy or other sensation scales he/she can have depression if those scales have low value.
+while considering a problem with sleep it can also help in getting to us as a symptom of depression
+and if a person is taking medication to sleep they can also become one of the factors for depression 
+So for prediction of depression, we made the 3 models and their hypothesis
+### Hypotheses
+
+The particular hypotheses to be investigated are:
+
+##Hypothesis 1:
+
+H0: There will be no significant prediction of depression by sleepy and other sensation scale & have a problem with sleep.
+H1: There will be a significant prediction of depression by sleepy and other sensation scale & have a problem with sleep.
+
+##Hypothesis 2:
+
+H0: There will be no significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety
+H1: There will be a significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety.
+
+##Hypothesis 3:
+
+H0: There will be no significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety & medication help.
+H1: There will be a significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety & medication help.
+
+```{r setup}
+library(rmarkdown)
+library(dplyr)
+library(ggplot2)
+library(psych)
+library(pastecs)
+library(semTools)
+library(car)
+library(effsize)
+library(lm.beta)
+library(stargazer)
+library(userfriendlyscience)
+library(MASS)
+library(ppcor)
+library(olsrr)
+library(pander)
+sleep <- read.csv('sleep5ED.csv', header = TRUE, sep = ",")
+#View(sleep)
+
+
+
+```
+
+##2 METHADOLOGY
+
+we have read the dataset in the R considered my variable of interest and put all of them in a myData variable . for the missing value we are getting here some missing values but I have made a new dataset when all my variables are chooses and the then removed na values from that data frame .for one just took the variables and performed test on them. 
+```{r var_interest}
+myData<-"
+ Concept                                  | Variable Name    | Statistical Type      | Possible Values
+   HADS Anxiety                                  |anxiety            |scale              |Total HADS Anxiety score (range from 0=no anxiety to 21=severe anxiety)
+sleepy and other sensation scale                  | totsas            |scale              |Total Sleepiness and associated
+sensation scale score (5=low, 50=extreme sleepiness)
+   HADS Depression                                |depress            |scale              |range from 0=no depression to 21=severe depression
+ Do you have problem with your sleep              |problem            |Nominal            |1=yes 2=no
+Medication help                                   |medhelp            |Nominal            |1=yes 2=no"
+
+
+df <- read.delim(textConnection(myData),header=FALSE,sep="|",strip.white=TRUE,stringsAsFactors=FALSE)
+names(df) <- unname(as.list(df[1,])) # headers
+df <- df[-1,] # remove first row
+row.names(df)<-NULL
+pander(df, style = 'rmarkdown')
+```
+##3 DATASET
+variable that are considered and modified
+##1. Level of anxiety
+
+```{r variable 1}
+pastecs::stat.desc(sleep$anxiety, basic=F)
+#skewness and kurtosis  
+anskew<-semTools::skew(sleep$anxiety)
+ankurt<-semTools::kurtosis(sleep$anxiety)
+anskew
+ankurt
+
+#We divide the skew statistic by the standard error to get the standardised score
+stdskew1<-anskew[1]/anskew[2]
+stdkurt1<-ankurt[1]/ankurt[2]
+stdkurt1
+stdskew1
+outliers <- sleep %>% 
+  filter(scale(anxiety) >3.29 | scale(anxiety) < -3.29)
+outliers
+#count them using dplyr summarize
+numoutliers<-outliers %>%
+  summarize(count=n())
+fullcount<-sleep %>%
+  summarize(count=n())
+numoutliers
+fullcount
+
+```
+##Report of normality analysis
+The first variable is a HADS Anxiety taken as the level of anxiety which is a scalar variable which is taken as a predictor to predict the variable to be predicted .for this predictor we have to check for normality.
+To do that firstly stat.desc the anxiety and finding its skewness and kurtosis by using semtools, to make the values into standardised value, remove the error by stdskew<-skew[1]/skew[2] & stdkurt <-kurt[1]/kurt[2].For anxiety the values are 3.66 & -0.13 respectively kurtosis is within the limit but stdskew is not in between -2 to 2 by this anxiety cannot be said as normal.by this can't say that this is not parametric .we tried to find outliers but could not be found any outliers,standardised scores were inside  the acceptable range of +/3.29. level of anxiety will, therefore, be
+treated as a not normal within this analysis. we can see non-normality by ggplot (histogram) and the QQ plot from plots given below(figure 1: Level of anxiety & figure 2: QQPlot or level of anxiety).
+
+
+```{r plots_var1}
+#create a histogram showing skewness and kurtosis 
+ggplot(sleep, aes(y = ..density.., x = anxiety)) + 
+  geom_histogram(fill = 'green') + 
+  geom_density(colour = 'black') + xlab(expression(bold('anxiety'))) + 
+  ylab(expression(bold('Density')))+ggtitle('Figure 1: Level of anxiety')
+
+#Create a qqplot
+qqnorm(sleep$anxiety,  main="Figure 2: QQPlot or level of anxiety")
+qqline(sleep$anxiety, col=2)
+```
+
+##2. sleepy and other sensation scale
+```{r variable 2}
+pastecs::stat.desc(sleep$totsas, basic=F)
+#skewness and kurtosis  
+tsskew<-semTools::skew(sleep$totsas)
+tskurt<-semTools::kurtosis(sleep$totsas)
+tsskew
+tskurt
+
+#We divide the skew statistic by the standard error to get the standardised score
+stdskew2<-tsskew[1]/tsskew[2]
+stdkurt2<-tskurt[1]/tskurt[2]
+stdkurt2
+stdskew2
+
+outliers <- sleep %>% 
+  filter(scale(totsas) >3.29 | scale(totsas) < -3.29)
+outliers
+
+```
+##Report of normality analysis
+the second variable is a sleepy and sensation scale which is a scalar variable which is taken as a predictor to predict the variable to be predicted(depression) .for this predictor we have to check for normality.
+To do that firstly stat.desc the totsas variable which describes its mean, median, variance, std and finding its skewness and kurtosis by using semtools , to make the values into standardised value , remove the error by stdskew<-skew[1]/skew[2] & stdkurt <-kurt[1]/kurt[2] .For sleepy and other sensation scales the values are -0.366 & -3.654 respectively kurtosis is not within the limit but stdskew is in between -2 to 2 by this totsas can be said as normal. we tried to find outliers but could not be found any outliers, standardised scores were inside the acceptable range of +/3.29. sleepy and other sensations will, therefore, be
+treated as a normal within this analysis.  we can see normality by ggplot (histogram) and the QQ plot from plots given below(figure 3: Sleepy and other sensation Scale & figure 4: QQPlot or sleepy & other sensation scales).
+
+```{r plots_var2}
+#create a histogram showing skewness and  kurtosis
+ggplot(sleep, aes(y = ..density.., x = totsas)) + 
+  geom_histogram(fill = 'green') + 
+  geom_density(colour = 'black') + xlab(expression(bold('sleepy and other sensation'))) + 
+  ylab(expression(bold('Density')))+ggtitle('Figure 3: Sleepy and other sensation Scale')
+
+#Create a qqplot
+qqnorm(sleep$totsas,  main="Figure 4: QQPlot or sleepy & other sensation scale")
+qqline(sleep$totsas, col=2)
+```
+##3. Level of Depression
+```{r variable 3}
+pastecs::stat.desc(sleep$depress, basic=F)
+#skewness and kurtosis  
+dpskew<-semTools::skew(sleep$depress)
+dpkurt<-semTools::kurtosis(sleep$depress)
+dpskew
+dpkurt
+
+#We divide the skew statistic by the standard error to get the standardised score
+stdskew2<-dpskew[1]/dpskew[2]
+stdkurt2<-dpkurt[1]/dpkurt[2]
+stdkurt2
+stdskew2
+outliers <- sleep %>% 
+  filter(scale(depress) >3.29 | scale(depress) < -3.29)
+outliers
+#count them using dplyr summarize
+numoutliers<-outliers %>%
+  summarize(count=n())
+fullcount<-sleep %>%
+  summarize(count=n())
+numoutliers
+fullcount
+#perform square root transform
+newDepress<-sqrt(sleep$depress)
+newDepress
+#skew&kurt for new transformed depress
+newDepress_skew<-semTools::skew(newDepress)
+newDepress_kurt<-semTools::kurtosis(newDepress)
+newDepress_skew
+newDepress_kurt
+#standadised skewness and kurtosis value
+newDepress_stdskew2<-newDepress_skew[1]/newDepress_skew[2]
+newDepress_stdkurt2<-newDepress_kurt[1]/newDepress_kurt[2]
+newDepress_stdkurt2
+newDepress_stdskew2
+#calculating outliers
+newDepress_<- scale(newDepress)
+outliers=0
+for(i in 1: length(newDepress_))
+    {
+if(!is.na(newDepress_[i]))
+   {
+if(newDepress_[i]>3.29|newDepress_[i]<3.29)
+{
+  outliers=outliers+1
+}
+    }
+    }
+fullcount<-length(newDepress_)
+outliers
+fullcount
+
+```
+##Report of normality analysis
+The third variable is an HDAS Depression taken as Level of Depression which is a scalar variable which is taken as a scale to be predicted in the multiple regression by the 4 other variable 2 scaler and other 2 categorical .for this response variable we have to check for normality.
+To do that firstly stat.desc the depress variable which describes its mean, median, variance, std and finding its skewness and kurtosis by using semtools, to make the values into standardised value, remove the error by stdskew<-skew[1]/skew[2] & stdkurt <-kurt[1]/kurt[2] .For Level of depression, the values are 6.372 & 0.360 respectively kurtosis is within the limit but stdskew is not in between -2 to 2 limits, by this depress can be said as not normal. we tried to find outliers but could not be found any outliers, standardised scores were inside the acceptable range of +/3.29.
+
+As it is the response variable I tried to transform it and tried to turn it to normal.For transformation sqrt(depress)is conducted and save it to a new variable i.e newDepress while performing skewness and kurtosis the get new values, after finding stdskew & stdkurt i.e-1.065 & -1.684 these both the values are in the limit of -2 & 2 so this newDepress can be said as normal and we can take this new variable as the response variable which will be predicted by the predictors.
+Level of Depression will therefore be
+treated as a normal within this analysis.  we can see normality by ggplot (histogram) and the QQ plot from plots given below(figure 5: Depression Level & figure 6: QQPlot or Depression level).
+
+
+```{r plots_var3}
+ggplot( )+aes(y = ..density.., x = newDepress) + 
+  geom_histogram(fill = 'green') + 
+  geom_density(colour = 'black') + xlab(expression(bold('Level of Depression'))) + 
+  ylab(expression(bold('Density')))+ggtitle('Figure 5: Depression Level')
+
+#Create a qqplot
+qqnorm(newDepress,  main="Figure 6: QQPlot or Depression level")
+qqline(newDepress, col=2)
+```
+##4.Problem with sleep
+```{r variable 4}
+table(sleep$problem)
+
+sleep_problem <- data.frame(
+  group = c("yes", "no"),
+  value = c(117, 152)
+  )
+head(sleep_problem)
+```
+##Desc of a problem with sleep
+the fourth variable is a problem with sleep which is a categorical variable that means it has just 2 outputs yes: having a problem with sleep and No: don't have a problem with sleep which have the value 117 and 152 respectively. making the new data frame in which 2 groups are there and their respective values so that this data frame can be further used to plot in the bar graph or the pie chart 
+For this variable, I have made a pie chart using the bar graph. In the bar graph, the groups are filled inside and separated by the values by colour, which is further used to make pie chart as the aes are taken of the bar graph only and theta is shown by the values it has, which can be seen in Figure 8 & 7.
+```{r bar_sleep_problem}
+bar <- ggplot(sleep_problem, aes(x=" ",y=value, fill=group))
+bar<- bar +geom_bar(width = 0.5, stat = "identity") + labs(x="sleep problem", title="Figure 7:problem with sleep bar graph") 
+
+#pie chart formation
+pie<-bar+coord_polar(theta = 'y')+ labs( title="Figure 8:problem with sleep pie chart") 
+
+pie
+```
+##5. Medication Help
+```{r variable 5}
+table(sleep$medhelp)
+
+medication_help <- data.frame(
+  medicine_help = c("yes ", "no"),
+  value = c(256, 15)
+  )
+head(medication_help)
+```
+##Desc of medication help
+the fifth variable is medication help which is a categorical variable that means it has just 2 outputs yes: having medication help and No: don't have medication help which has the value 256 and 15 respectively. making the new data frame in which 2 groups are there and their respective values so that this data frame can be further used to plot in the bar graph or the pie chart 
+For this variable, I have made a pie chart using the bar graph. In the bar graph the groups are filled inside and separated by the values by colour same as done for the previous variable because both are nominal, which is further used to make pie chart as the aes are taken of the bar graph only and theta is shown by the values it has, which can be seen in Figure 9 & 10.
+ 
+
+```{r bar_medicine_help}
+bar <- ggplot(medication_help, aes(x=" ",y=value, fill=medicine_help))
+bar<- bar +geom_bar(width = 0.5, stat = "identity") + labs(x="medication help", title="Figure 9: medication help bar graph") 
+
+#pie chart formation
+pie<-bar+coord_polar(theta = 'y')+ labs( title="Figure 10:medication help pie chart") 
+
+pie
+```
+####Creating New dataset and omiting missing values
+```{r new dataset}
+# creating new data and omiting missing value
+
+sleep_copy <- data.frame(sleep$anxiety, sleep$totsas, sleep$problem, sleep$medhelp)
+names(sleep_copy) <- c("anxiety", "totsas","problem", "medhelp" )
+#adding the transformed depress variable into the new dataset that is tidy and will be used further
+sleep_copy$newDepress<-newDepress
+#removing the "na" values from the dataset
+na.omit(sleep_copy)
+#View(sleep_copy)
+
+```
+
+##Spearmen test for corelation
+```{r correlation_newDepress to level of anxiety}
+#spearman correlation
+cor.test(sleep_copy$newDepress, sleep_copy$anxiety, method = "spearman")
+#kendall correlation to calculate accute p-value
+cor.test(sleep_copy$newDepress, sleep_copy$anxiety, method = "kendall")
+
+#creating scatter plot
+scatter<-ggplot(sleep_copy, aes(sleep_copy$newDepress, sleep_copy$anxiety))
+scatter + geom_point()+ geom_smooth(method = 'lm', colour='pink', se=F)+ labs(x="Level of Depression", y="hour sleep on week days ")
+```
+The relationship between transformed depression and Level of anxiety was investigated using a
+Spearman correlation because there was no normality so used a non-parametric Test. A large/strong and positive correlation was found (rho =-0.5761479 S = 1359800, p-value = -10.0197).
+absolute value of p-value is 2.2e-16
+There is a strong relationship between Level of depression and Level of anxiety.
+
+##Pearson test for correlation
+```{r correlation_newDepress to sleepy and associated sensation scale}
+cor.test(sleep_copy$newDepress, sleep_copy$totsas, method = "pearson")
+#pearson correlation
+#creating scatter plot
+scatter<-ggplot(sleep_copy, aes(sleep_copy$newDepress, sleep_copy$totsas))
+scatter + geom_point()+ geom_smooth(method = 'lm', colour='pink', se=F)+ labs(x="Level of Depression", y="Sleepy & associated sensations scale")
+```
+The relationship between transformed depression and sleepy and other sensation scale was investigated using aPearson correlation because there was normality so used a parametric Test. A medium/moderate and positive correlation was found (cor =0.4836 t = 8.6856, p-value = -1.7398).
+an absolute value of p-value is -1.7398 There is a moderate relationship between Level of depression and sleepy and other sensation scales.
+
+## t-test for depression and problem with sleep
+```{r t test_depression & sleep problem}
+
+diff1<- psych::describeBy(sleep_copy$newDepress, group = sleep_copy$problem)
+diff1
+sleep_copy$problem<-as.factor(sleep_copy$problem)
+#levene test
+car::leveneTest(newDepress ~ problem, data=sleep_copy) 
+#t-test
+stats::t.test(newDepress~problem,var.equal=FALSE,data=sleep_copy)
+#cohen.d is used to find the effect size
+#View(sleep_copy)
+effsize::cohen.d(sleep_copy$newDepress, sleep_copy$problem, alpha = 0.05, std=TRUE, na.rm=TRUE)
+
+```
+A Levene's test for homogeneity of variance was conducted and indicated equality of variance for the level of depression
+for a problem with sleep(yes) or not problem with sleep(no) respondents (F=0.903, Pr=0.342). An independent-samples t-test was conducted to compare depression level for yes and no respondents. No significant difference in the scores for  was found (M=1.93, SD= 0.82 for yes respondents, M= 1.42, SD= 0.9 for no respondents), (t=4.864, p = -0.587). The cohen.d test result (-0.60(medium)).
+
+## t-test for depression and Medication Help
+```{r t test_depression & medication help}
+
+diff1<- psych::describeBy(sleep_copy$newDepress, group = sleep_copy$medhelp)
+diff1
+sleep_copy$medhelp<-as.factor(sleep_copy$medhelp)
+#levene test
+car::leveneTest(newDepress ~ medhelp, data=sleep_copy)
+#t-test
+stats::t.test(newDepress~medhelp,var.equal=FALSE,data=sleep_copy)
+#cohen.d is used to find the effect size
+#View(sleep_copy)
+effsize::cohen.d(sleep_copy$newDepress, sleep_copy$medhelp, alpha = 0.05, std=TRUE, na.rm=TRUE)
+
+```
+A Levene's test for homogeneity of variance was conducted and indicated equality of variance for the level of depression
+for medication help(yes) or not medication help(no) respondents (F=1.213, Pr=0.271). An independent-samples t-test was conducted to compare depression level for yes and no respondents. No significant difference in the scores for  was found (M=1.94, SD= 0.78 for yes respondents, M= 1.62, SD= 0.91 for no respondents), (t=1.5071, p = 0.150). The cohen.d test result (-0.40(small)).
+
+##4 RESULTS
+
+
+
+```{r model 1}
+
+model1<-lm(sleep_copy$newDepress ~ sleep_copy$totsas + sleep_copy$problem)
+anova(model1)
+summary(model1)
+stargazer(model1, type="text") #Tidy output of all the required stats
+#check assumptions
+#cook distance
+cooks.distance(model1)
+#plot cook distance, qq plot, histogram
+plot(model1)
+#colinearity
+car::vif(model1)
+#tolerence
+1/car::vif(model1)
+
+```
+###Model 1
+
+A multiple linear regression was calculated to predict Level of depression based on their sleepy and other sensation scale and a problem with sleep. A significant regression equation was found (F(2, 244) = 73.603, p <.000 , with an R2 of .2317. Participants' predicted depression is equal to 0.571764 - 0.008372 (problem) + 0.040985 (totsas), where problem is coded as 1 = yes, 2 = no, and totsas is measured in numbers. depression increased with 0.0409 for sleepy and other sensational scale and no problem 0.0083 more than yes. Both totsas and problem were significant predictors of depression.
+
+##Hypothesis 1:
+
+H0: There will be no significant prediction of depression by sleepy and other sensation scale & have a problem with sleep.
+H1: There will be a significant prediction of depression by sleepy and other sensation scale & have a problem with sleep.
+
+as the predictors have significant value we can reject the null hypothesis and say there is significant prediction by sleepy and other sensation with the problem of sleep. 
+
+```{r model 2}
+
+model2<-lm(sleep_copy$newDepress ~ sleep_copy$totsas + sleep_copy$problem +sleep_copy$anxiety)
+anova(model2)
+summary(model2)
+stargazer(model2, type="text") #Tidy output of all the required stats
+#check assumptions
+#cook distance
+cooks.distance(model2)
+#plot cook distance, qq plot, histogram
+plot(model2)
+#colinearity
+car::vif(model2)
+#tolerence
+1/car::vif(model2)
+
+```
+###Model 2
+
+A multiple linear regression was calculated to predict Level of depression based on their sleepy and other sensation scale and a problem with sleep and anxiety level. A significant regression equation was found (F(3, 243) = 130.822, p <0.000 , with an R2 of .341. Participants' predicted depression is equal to 0.294 - 0.0346 (problem) + 0.0247 (totsas)+ 0.1052 (anxiety), where problem is coded as 1 = yes, 2 = no, and totsas is measured in numbers and anxiety is measured in numbers. depression increased with 0.0247 for sleepy and other sensational scale and no problem 0.0.0346 more than yes and increases with 0.105 for a level of anxiety. anxiety, totsas and problem were significant predictors of depression.
+
+##Hypothesis 2:
+
+H0: There will be no significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety
+H1: There will be a significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety.
+
+as the predictors have significant value we can reject the null hypothesis and say there are significant prediction by sleepy and other sensation with a problem of sleep and with anxiety
+```{r model 3}
+model3<-lm(sleep_copy$newDepress ~ sleep_copy$totsas + sleep_copy$problem +sleep_copy$anxiety + sleep_copy$medhelp)
+anova(model3)
+summary(model3)
+stargazer(model3, type="text") #Tidy output of all the required stats
+#check assumptions
+#cook distance
+cooks.distance(model3)
+#plot cook distance, qq plot, histogram
+plot(model3)
+#colinearity
+car::vif(model3)
+#tolerence
+1/car::vif(model3)
+
+```
+###Model 3
+
+A multiple linear regression was calculated to predict Level of depression based on their sleepy and other sensation scale and the problem with sleep and anxiety level and medication help. A significant regression equation was found (F(4, 242) = 130.492, p <0.71 , with an R2 of .339. Participants' predicted depression is equal to 0.222 - 0.0300 (problem) + 0.0247 (totsas)+ 0.1059 (anxiety)+0.0759(medhelp), where problem is coded as 1 = yes, 2 = no,medhelp is coded as 1 = yes, 2 = no and totsas is measured in numbers and anxiety is measured in numbers. depression increased with 0.0247 for sleepy and other sensational scale and no problem 0.0.0300 more than yes and increases with 0.105 for a level of anxiety and no medhelp 0.0.0759 more than yes. anxiety, totsas, medhelp and problem were significant predictors of depression.
+
+##Hypothesis 3:
+
+H0: There will be no significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety & medication help.
+H1: There will be a significant prediction of depression by sleepy and other sensation scale & have a problem with sleep & anxiety & medication help.
+
+as the predictors have significant value we can reject the null hypothesis and say there is significant prediction by sleepy and other sensation with problems of sleep and with anxiety with medication help.
+
+###comparision of models
+```{r comparison of model}
+anova(model1, model2, test="Chisq")
+anova(model2, model3, test="Chisq")
+anova(model3, model1, test="Chisq")
+```
+while comparing all the three model we see that while comparing model 1 and model 2 the significant value of model 2 is greater than 1 so here we see model 1 is better than 2nd similarly while comparing model 2 with model 3, model 3 has greater significance than the second so we say here that model 2 is better but again when we compare model 1 with model 3 we get model 1 as a better model so for this we can say that as we have compared model 1 with 2nd and 3rd we got 1st is the better so we can finally say that MODEL1 is the better model of all.
+
+##5 DISCUSSION
+#MODEL1
+In the first model we got the result as significant so by that we rejected our null hypothesis.the value for level of depression we get is 0.603 and residuals found are -2.171 - 1.902 to see the usefulness of this model we see R^2 whose value is .225 which states 22.5% variables(totsas & problem) can predict for level of depression as p-value is <-11.077 so we can also say this model fits for this pridiction very well.F-stat:36.8 on 2 for colineirity and tolerence in model 1 (vif<2.5 and tolerance>0.4) conditions are satisfied for both the variable so we dont have to test further. 
+#MODEL2 
+In the second model we got the result as significant so by that we rejected our null hypothesis.the value for level of depression we get is 0.389 and residuals found are -2.433 - 1.570 to see the usefulness of this model we see R^2 whose value is .341 which states 34.1% variables(totsas & problem & anxiety) can predict for level of depression as p-value is <-10.019 so we can also say this model fits for this pridiction very well.F-stat:43.61 on 3 for colineirity and tolerence in model 1 (vif<2.5 and tolerance>0.4) conditions are satisfied for three of the variable so we dont have to test further. 
+#MODEL3
+In the third model we got the result as significant so by that we rejected our null hypothesis.the value for level of depression we get is 0.127 and residuals found are -2.433 - 1.566 to see the usefulness of this model we see R^2 whose value is .339 which states 33.9% variables(totsas & problem & anxiety & medhelp) can predict for level of depression as p-value is <-10.019 so we can also say this model fits for this pridiction very well.F-stat:32.68 on 4 for colineirity and tolerence in model 1 (vif<2.5 and tolerance>0.4) conditions are satisfied for three of the variable so we dont have to test further.
+##6 REFERENCE
+
+Field, A., Miles, J., & Field, Z. (2012). Discovering statistics using R. Sage publications.
+George, D. (2011).
+
+
+
+
+
